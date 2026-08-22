@@ -1,0 +1,13 @@
+support-chat-web
+Copyright © 2026 Brocent Cloud Service. All rights reserved.
+
+This application is licensed under the GNU General Public License v3.0 only
+(see LICENSE). Copyright in this application remains with Brocent Cloud
+Service; the GPL is the license under which it is made available.
+
+This application bundles the following third-party components:
+
+- @openim/client-sdk — Copyright the OpenIM project contributors,
+  licensed under GPL-3.0-only (https://github.com/openimsdk)
+- React, Ant Design and other dependencies under their respective
+  permissive licenses (MIT/Apache-2.0) — see package.json
