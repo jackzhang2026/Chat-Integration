@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Copyright © 2026 Brocent Cloud Service. SPDX-License-Identifier: GPL-3.0-only -->
+  <!-- BCS Beam "B" monogram tile — typography-only brand (v1.3): the letter B in
+       the system stack on the steel gradient. Used ONLY where the full wordmark
+       cannot fit (favicon / tray); never beside or instead of the wordmark. -->
+  <defs>
+    <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1a7af0"/>
+      <stop offset="1" stop-color="#0d3766"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#steel)"/>
+  <text x="32" y="45.5" text-anchor="middle" font-size="38" font-weight="800" fill="#ffffff"
+        font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif">B</text>
+</svg>

@@ -71,6 +71,35 @@ const App: React.FC = () => {
   return (
     <Layout style={{ height: '100vh', background: '#fff' }}>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+        {/* Brand v1.3 (wordmark-only): the trust promise renders before any
+            conversation content — security is the first thing a customer reads. */}
+        <div style={{
+          background: '#081c33', color: 'rgba(255,255,255,0.72)', fontSize: 11.5,
+          textAlign: 'center', padding: '5px 10px', letterSpacing: '0.04em', flexShrink: 0,
+        }}
+        >
+          🔒 {t('trustBar')}
+        </div>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px',
+          borderBottom: '1px solid #f0f0f0', flexShrink: 0,
+        }}
+        >
+          <span style={{ fontWeight: 800, letterSpacing: '0.03em', fontSize: 15, color: '#262626' }}>
+            <span style={{ color: '#1890ff' }}>BCS</span> Beam{' '}
+            <span style={{ fontWeight: 500, color: '#8c8c8c' }}>{t('brandSupport')}</span>
+          </span>
+          {phase === 'ready' && connectionState === 'connected' && (
+            <span style={{
+              marginLeft: 'auto', fontSize: 12, color: '#8c8c8c',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}
+            >
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#52c41a' }} />
+              {t('connected')}
+            </span>
+          )}
+        </div>
         <div style={{ flex: 1, minHeight: 0 }}>
           {phase === 'boot' && (
             <div style={{
@@ -79,7 +108,8 @@ const App: React.FC = () => {
             }}
             >
               <Spin size="large" />
-              <Text type="secondary">{t('connecting')}</Text>
+              <Text strong>{t('connecting')}</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>{t('connectingHint')}</Text>
             </div>
           )}
           {phase === 'error' && (

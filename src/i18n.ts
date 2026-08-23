@@ -6,7 +6,10 @@
 
 const dictionaries = {
   en: {
-    connecting: 'Connecting…',
+    connecting: 'Establishing a secure connection…',
+    connectingHint: 'Via Brocent-hosted servers — usually a few seconds',
+    trustBar: 'Self-hosted by Brocent · End-to-end managed',
+    brandSupport: 'Support',
     connected: 'Connected',
     reconnecting: 'Connection lost — reconnecting…',
     connectFailed: 'Could not connect to chat. Please close this window and try again.',
@@ -30,7 +33,10 @@ const dictionaries = {
     ticketAnnounce: 'A support ticket has been created for this conversation:',
   },
   zh: {
-    connecting: '连接中…',
+    connecting: '正在建立加密连接…',
+    connectingHint: '通过 Brocent 自有服务器，通常只需几秒',
+    trustBar: '由 Brocent 自托管 · 端到端受控',
+    brandSupport: '支持',
     connected: '已连接',
     reconnecting: '连接中断——正在重连…',
     connectFailed: '无法连接聊天服务，请关闭窗口后重试。',
