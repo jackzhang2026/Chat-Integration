@@ -31,6 +31,7 @@ const App: React.FC = () => {
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting');
   const [groupID, setGroupID] = useState<string | null>(null);
   const [incoming, setIncoming] = useState<ChatMessage[]>([]);
+  const [deviceToken, setDeviceToken] = useState<string | undefined>(undefined);
   const bootedRef = useRef(false);
 
   useEffect(() => {
@@ -40,6 +41,7 @@ const App: React.FC = () => {
     const params = new URLSearchParams(window.location.search);
     const deviceToken = params.get('t');
     const staffGroup = params.get('group');
+    if (deviceToken) setDeviceToken(deviceToken);  // device mode → enables chat-to-ticket
 
     (async () => {
       try {
@@ -86,7 +88,12 @@ const App: React.FC = () => {
             </div>
           )}
           {phase === 'ready' && groupID && (
-            <ChatView groupID={groupID} connectionState={connectionState} incoming={incoming} />
+            <ChatView
+              groupID={groupID}
+              connectionState={connectionState}
+              incoming={incoming}
+              deviceToken={deviceToken}
+            />
           )}
         </div>
         <div style={{

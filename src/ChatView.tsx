@@ -1,8 +1,9 @@
 // Copyright © 2026 Brocent Cloud Service. All rights reserved.
 // SPDX-License-Identifier: GPL-3.0-only
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Button, Input, Spin, Typography } from 'antd';
-import { SendOutlined } from '@ant-design/icons';
+import { Alert, Button, Input, Modal, Spin, Typography, message as antdMessage } from 'antd';
+import { FileAddOutlined, SendOutlined } from '@ant-design/icons';
+import { createTicketFromChat } from './backendApi';
 import { type ChatMessage, type ConnectionState, loadHistory, sendText } from './openim';
 import { t } from './i18n';
 
@@ -21,6 +22,9 @@ interface Props {
   connectionState: ConnectionState;
   /** Live messages pushed up from the SDK bridge (App owns the subscription). */
   incoming: ChatMessage[];
+  /** Present only in device mode — enables the chat-to-ticket button (the
+   * backend re-verifies it and that this conversation belongs to the device). */
+  deviceToken?: string;
 }
 
 const bubbleStyle = (isSelf: boolean): React.CSSProperties => ({
@@ -36,12 +40,15 @@ const bubbleStyle = (isSelf: boolean): React.CSSProperties => ({
   color: isSelf ? '#fff' : COLOR_TEXT,
 });
 
-const ChatView: React.FC<Props> = ({ groupID, connectionState, incoming }) => {
+const ChatView: React.FC<Props> = ({ groupID, connectionState, incoming, deviceToken }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [failedDraft, setFailedDraft] = useState<string | null>(null);
+  const [ticketOpen, setTicketOpen] = useState(false);
+  const [ticketDesc, setTicketDesc] = useState('');
+  const [ticketBusy, setTicketBusy] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -86,6 +93,32 @@ const ChatView: React.FC<Props> = ({ groupID, connectionState, incoming }) => {
       setSending(false);
     }
   }, [groupID, sending]);
+
+  const doCreateTicket = useCallback(async () => {
+    const desc = ticketDesc.trim();
+    if (!desc || !deviceToken || ticketBusy) return;
+    setTicketBusy(true);
+    try {
+      const result = await createTicketFromChat(deviceToken, groupID, desc);
+      setTicketOpen(false);
+      setTicketDesc('');
+      if (result.created) {
+        antdMessage.success(`${t('ticketCreated')} · ${result.ticket_number}`);
+        // Announce in the conversation so the technician side sees the number
+        // too; a failed announce must not fail the (already created) ticket.
+        try {
+          const sent = await sendText(groupID, `${t('ticketAnnounce')} ${result.ticket_number}`);
+          setMessages((cur) => (cur.some((m) => m.clientMsgID === sent.clientMsgID) ? cur : [...cur, sent]));
+        } catch { /* ticket exists; announcement is best-effort */ }
+      } else {
+        antdMessage.info(`${t('ticketExisting')} · ${result.ticket_number}`);
+      }
+    } catch {
+      antdMessage.error(t('ticketFailed'));
+    } finally {
+      setTicketBusy(false);
+    }
+  }, [deviceToken, groupID, ticketDesc, ticketBusy]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
@@ -133,6 +166,15 @@ const ChatView: React.FC<Props> = ({ groupID, connectionState, incoming }) => {
         display: 'flex', gap: 8, padding: 12, borderTop: `1px solid ${COLOR_BORDER}`, flexShrink: 0,
       }}
       >
+        {deviceToken && (
+          <Button
+            icon={<FileAddOutlined />}
+            onClick={() => setTicketOpen(true)}
+            title={t('createTicket')}
+          >
+            {t('createTicket')}
+          </Button>
+        )}
         <Input.TextArea
           autoSize={{ minRows: 1, maxRows: 4 }}
           value={draft}
@@ -156,6 +198,26 @@ const ChatView: React.FC<Props> = ({ groupID, connectionState, incoming }) => {
           {t('send')}
         </Button>
       </div>
+
+      <Modal
+        title={t('ticketModalTitle')}
+        open={ticketOpen}
+        onOk={doCreateTicket}
+        onCancel={() => setTicketOpen(false)}
+        okText={t('ticketSubmit')}
+        cancelText={t('ticketCancel')}
+        confirmLoading={ticketBusy}
+        okButtonProps={{ disabled: !ticketDesc.trim() }}
+      >
+        <Input.TextArea
+          autoSize={{ minRows: 4, maxRows: 8 }}
+          value={ticketDesc}
+          placeholder={t('ticketDescPlaceholder')}
+          onChange={(e) => setTicketDesc(e.target.value)}
+          maxLength={4000}
+          showCount
+        />
+      </Modal>
     </div>
   );
 };
