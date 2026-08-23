@@ -18,6 +18,12 @@ export interface ChatMessage {
   isSelf: boolean;
 }
 
+/** A support group (customer intake / device chat) or a direct 1:1 peer
+ * (TASK-059 P1.5 ⑤: staff messaging a customer/vendor contact directly). */
+export type ChatTarget =
+  | { kind: 'group'; groupID: string }
+  | { kind: 'peer'; userID: string };
+
 const sdk = getSDK();
 
 let selfUserID = '';
@@ -79,12 +85,24 @@ export async function connect(opts: LoginOptions): Promise<void> {
   });
 }
 
-/** OpenIM derives super-group conversation ids as sg_<groupID>. */
+/** OpenIM derives super-group conversation ids as sg_<groupID> and 1:1
+ * ("single") conversation ids as si_<lower>_<higher> (lexicographically
+ * sorted user ids) — ported verbatim from the server's own
+ * pkg/util/conversationutil.GenConversationIDForSingle /
+ * GenGroupConversationID (openim-src, v3.8.3-patch.15) rather than guessed,
+ * since getting this wrong means silently reading/writing the wrong
+ * conversation. */
 export const conversationIdForGroup = (groupID: string): string => `sg_${groupID}`;
+export const conversationIdForPeer = (peerUserID: string): string =>
+  `si_${[selfUserID, peerUserID].sort().join('_')}`;
 
-export async function loadHistory(groupID: string, beforeClientMsgID = ''): Promise<ChatMessage[]> {
+const conversationIdFor = (target: ChatTarget): string => (
+  target.kind === 'group' ? conversationIdForGroup(target.groupID) : conversationIdForPeer(target.userID)
+);
+
+export async function loadHistory(target: ChatTarget, beforeClientMsgID = ''): Promise<ChatMessage[]> {
   const { data } = await sdk.getAdvancedHistoryMessageList({
-    conversationID: conversationIdForGroup(groupID),
+    conversationID: conversationIdFor(target),
     count: 40,
     startClientMsgID: beforeClientMsgID,
   });
@@ -92,10 +110,15 @@ export async function loadHistory(groupID: string, beforeClientMsgID = ''): Prom
   return list.map(toChatMessage);
 }
 
-export async function sendText(groupID: string, text: string): Promise<ChatMessage> {
+export async function sendText(target: ChatTarget, text: string): Promise<ChatMessage> {
   const created = await sdk.createTextMessage(text);
   const message = created.data as MessageItem;
-  await sdk.sendMessage({ recvID: '', groupID, message });
+  // SDK convention: exactly one of recvID/groupID is non-empty per send.
+  if (target.kind === 'group') {
+    await sdk.sendMessage({ recvID: '', groupID: target.groupID, message });
+  } else {
+    await sdk.sendMessage({ recvID: target.userID, groupID: '', message });
+  }
   return toChatMessage(message);
 }
 

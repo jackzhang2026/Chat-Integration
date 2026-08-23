@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Button, Input, Modal, Spin, Typography, message as antdMessage } from 'antd';
 import { FileAddOutlined, SendOutlined } from '@ant-design/icons';
 import { createTicketFromChat } from './backendApi';
-import { type ChatMessage, type ConnectionState, loadHistory, sendText } from './openim';
+import { type ChatMessage, type ChatTarget, type ConnectionState, loadHistory, sendText } from './openim';
 import { t } from './i18n';
 
 const { Text } = Typography;
@@ -18,12 +18,14 @@ const COLOR_TEXT_SECONDARY = '#8c8c8c';
 const COLOR_BORDER = '#f0f0f0';
 
 interface Props {
-  groupID: string;
+  target: ChatTarget;
   connectionState: ConnectionState;
   /** Live messages pushed up from the SDK bridge (App owns the subscription). */
   incoming: ChatMessage[];
   /** Present only in device mode — enables the chat-to-ticket button (the
-   * backend re-verifies it and that this conversation belongs to the device). */
+   * backend re-verifies it and that this conversation belongs to the device).
+   * Ticket-from-chat is a support-group concept, so it also requires
+   * target.kind === 'group' — a 1:1 staff↔contact chat never offers it. */
   deviceToken?: string;
 }
 
@@ -40,7 +42,8 @@ const bubbleStyle = (isSelf: boolean): React.CSSProperties => ({
   color: isSelf ? '#fff' : COLOR_TEXT,
 });
 
-const ChatView: React.FC<Props> = ({ groupID, connectionState, incoming, deviceToken }) => {
+const ChatView: React.FC<Props> = ({ target, connectionState, incoming, deviceToken }) => {
+  const canTicket = !!deviceToken && target.kind === 'group';
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [draft, setDraft] = useState('');
@@ -53,7 +56,7 @@ const ChatView: React.FC<Props> = ({ groupID, connectionState, incoming, deviceT
 
   useEffect(() => {
     let cancelled = false;
-    loadHistory(groupID)
+    loadHistory(target)
       .then((history) => {
         if (!cancelled) setMessages(history);
       })
@@ -63,7 +66,8 @@ const ChatView: React.FC<Props> = ({ groupID, connectionState, incoming, deviceT
     return () => {
       cancelled = true;
     };
-  }, [groupID]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- target is set once by App and never mutated in place
+  }, [target.kind, target.kind === 'group' ? target.groupID : target.userID]);
 
   useEffect(() => {
     if (!incoming.length) return;
@@ -84,7 +88,7 @@ const ChatView: React.FC<Props> = ({ groupID, connectionState, incoming, deviceT
     setSending(true);
     setFailedDraft(null);
     try {
-      const sent = await sendText(groupID, body);
+      const sent = await sendText(target, body);
       setMessages((cur) => (cur.some((m) => m.clientMsgID === sent.clientMsgID) ? cur : [...cur, sent]));
       setDraft('');
     } catch {
@@ -92,14 +96,14 @@ const ChatView: React.FC<Props> = ({ groupID, connectionState, incoming, deviceT
     } finally {
       setSending(false);
     }
-  }, [groupID, sending]);
+  }, [target, sending]);
 
   const doCreateTicket = useCallback(async () => {
     const desc = ticketDesc.trim();
-    if (!desc || !deviceToken || ticketBusy) return;
+    if (!desc || !deviceToken || target.kind !== 'group' || ticketBusy) return;
     setTicketBusy(true);
     try {
-      const result = await createTicketFromChat(deviceToken, groupID, desc);
+      const result = await createTicketFromChat(deviceToken, target.groupID, desc);
       setTicketOpen(false);
       setTicketDesc('');
       if (result.created) {
@@ -107,7 +111,7 @@ const ChatView: React.FC<Props> = ({ groupID, connectionState, incoming, deviceT
         // Announce in the conversation so the technician side sees the number
         // too; a failed announce must not fail the (already created) ticket.
         try {
-          const sent = await sendText(groupID, `${t('ticketAnnounce')} ${result.ticket_number}`);
+          const sent = await sendText(target, `${t('ticketAnnounce')} ${result.ticket_number}`);
           setMessages((cur) => (cur.some((m) => m.clientMsgID === sent.clientMsgID) ? cur : [...cur, sent]));
         } catch { /* ticket exists; announcement is best-effort */ }
       } else {
@@ -118,7 +122,7 @@ const ChatView: React.FC<Props> = ({ groupID, connectionState, incoming, deviceT
     } finally {
       setTicketBusy(false);
     }
-  }, [deviceToken, groupID, ticketDesc, ticketBusy]);
+  }, [deviceToken, target, ticketDesc, ticketBusy]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
@@ -166,7 +170,7 @@ const ChatView: React.FC<Props> = ({ groupID, connectionState, incoming, deviceT
         display: 'flex', gap: 8, padding: 12, borderTop: `1px solid ${COLOR_BORDER}`, flexShrink: 0,
       }}
       >
-        {deviceToken && (
+        {canTicket && (
           <Button
             icon={<FileAddOutlined />}
             onClick={() => setTicketOpen(true)}

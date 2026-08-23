@@ -9,7 +9,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Layout, Spin, Typography } from 'antd';
 import { exchangeDeviceToken, exchangeSessionToken } from './backendApi';
 import {
-  type ChatMessage, type ConnectionState, connect, findLatestSupportGroupID,
+  type ChatMessage, type ChatTarget, type ConnectionState, connect, findLatestSupportGroupID,
 } from './openim';
 import ChatView from './ChatView';
 import { t } from './i18n';
@@ -29,7 +29,7 @@ type Phase = 'boot' | 'ready' | 'error';
 const App: React.FC = () => {
   const [phase, setPhase] = useState<Phase>('boot');
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting');
-  const [groupID, setGroupID] = useState<string | null>(null);
+  const [target, setTarget] = useState<ChatTarget | null>(null);
   const [incoming, setIncoming] = useState<ChatMessage[]>([]);
   const [deviceToken, setDeviceToken] = useState<string | undefined>(undefined);
   const bootedRef = useRef(false);
@@ -41,6 +41,10 @@ const App: React.FC = () => {
     const params = new URLSearchParams(window.location.search);
     const deviceToken = params.get('t');
     const staffGroup = params.get('group');
+    // TASK-059 P1.5 ⑤: staff messaging a customer/vendor contact directly
+    // (1:1, no group) — mutually exclusive with staffGroup, group wins if both
+    // are somehow present since it's the more established path.
+    const staffPeer = params.get('peer');
     if (deviceToken) setDeviceToken(deviceToken);  // device mode → enables chat-to-ticket
 
     (async () => {
@@ -58,9 +62,15 @@ const App: React.FC = () => {
           onNewMessages: (msgs) => setIncoming(msgs),
         });
 
-        const resolvedGroup = staffGroup ?? (await findLatestSupportGroupID());
-        if (!resolvedGroup) throw new Error('no support conversation found');
-        setGroupID(resolvedGroup);
+        if (staffGroup) {
+          setTarget({ kind: 'group', groupID: staffGroup });
+        } else if (staffPeer) {
+          setTarget({ kind: 'peer', userID: staffPeer });
+        } else {
+          const resolvedGroup = await findLatestSupportGroupID();
+          if (!resolvedGroup) throw new Error('no support conversation found');
+          setTarget({ kind: 'group', groupID: resolvedGroup });
+        }
         setPhase('ready');
       } catch {
         setPhase('error');
@@ -117,9 +127,9 @@ const App: React.FC = () => {
               <Alert type="error" message={t('connectFailed')} showIcon />
             </div>
           )}
-          {phase === 'ready' && groupID && (
+          {phase === 'ready' && target && (
             <ChatView
-              groupID={groupID}
+              target={target}
               connectionState={connectionState}
               incoming={incoming}
               deviceToken={deviceToken}
