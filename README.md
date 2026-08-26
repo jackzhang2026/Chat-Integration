@@ -21,6 +21,14 @@ codebase. Its entire API surface toward the host backend is two endpoints:
 |---|---|---|
 | `/?t=<signed-device-token>` | Customer on a managed device | the signed token itself |
 | `/?mode=staff&group=<groupID>` | Technician (embedded in the host workbench) | host session cookie |
+| `/?mode=portal&group=<groupID>` | Signed-in customer/vendor portal user | credentials handed in via `postMessage` by the embedding host page (see `src/portalBridge.ts`) — this app makes **zero** backend calls of its own in this mode; the host already minted them via its own same-origin `POST /api/openim/token/` call |
+
+Portal mode's embedding host must, after this app signals readiness
+(`{source:'bcs-beam-chat', type:'ready'}`, posted to `window.parent`), reply
+with `{source:'bcs-beam-host', type:'openim-credentials', openimUserID,
+token, expireTimeSeconds}`. Set `VITE_TRUSTED_PARENT_ORIGIN` in production to
+the real portal origin — unset, this app accepts a credentials message from
+any embedding page, which is fine for local dev only.
 
 ## Develop
 
@@ -29,7 +37,8 @@ npm install
 npm run dev
 ```
 
-`VITE_API_BASE` defaults to same-origin `/api`.
+`VITE_API_BASE` defaults to same-origin `/api`. `VITE_TRUSTED_PARENT_ORIGIN`
+is unset by default (see Modes above).
 
 ## License
 

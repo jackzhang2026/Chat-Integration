@@ -1,13 +1,16 @@
 // Copyright © 2026 Brocent Cloud Service. All rights reserved.
 // SPDX-License-Identifier: GPL-3.0-only
 //
-// Entry logic: pick a mode from the URL, exchange credentials via one of the
-// two allowed backend endpoints, connect the OpenIM bridge, resolve the group,
-// render the conversation. The "Source code" footer link is this app's GPL
-// corresponding-source offer — do not remove it.
+// Entry logic: pick a mode from the URL, acquire credentials one of three
+// ways (device/staff hit a backend endpoint directly; portal receives
+// already-minted credentials from its embedding host — see portalBridge.ts),
+// connect the OpenIM bridge, resolve the group, render the conversation. The
+// "Source code" footer link is this app's GPL corresponding-source offer —
+// do not remove it.
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Layout, Spin, Typography } from 'antd';
 import { exchangeDeviceToken, exchangeSessionToken } from './backendApi';
+import { awaitPortalCredentials } from './portalBridge';
 import {
   type ChatMessage, type ChatTarget, type ConnectionState, connect, findLatestSupportGroupID,
 } from './openim';
@@ -40,6 +43,7 @@ const App: React.FC = () => {
 
     const params = new URLSearchParams(window.location.search);
     const deviceToken = params.get('t');
+    const mode = params.get('mode');
     const staffGroup = params.get('group');
     // TASK-059 P1.5 ⑤: staff messaging a customer/vendor contact directly
     // (1:1, no group) — mutually exclusive with staffGroup, group wins if both
@@ -49,9 +53,17 @@ const App: React.FC = () => {
 
     (async () => {
       try {
+        // Three credential sources, picked by (in order): a device token in
+        // the URL; `mode=portal` (host hands in already-minted credentials,
+        // see portalBridge.ts); otherwise the pre-existing default — this
+        // app's own session-cookie call, which is how staff embedding has
+        // always worked and stays the fallback so nothing already deployed
+        // needs a `mode=staff` param added to keep working.
         const creds = deviceToken
           ? await exchangeDeviceToken(deviceToken)
-          : await exchangeSessionToken();
+          : mode === 'portal'
+            ? await awaitPortalCredentials()
+            : await exchangeSessionToken();
 
         await connect({
           userID: creds.openimUserID,
